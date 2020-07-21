@@ -1,3 +1,26 @@
+class Print {
+  static methodDetail(_methodDesc, _procName, _procId, _error) {
+    let totalLen = 80,
+      firstLen =
+        Math.round((totalLen - _methodDesc.length) / 2) + _methodDesc.length,
+      title = (" " + _methodDesc + " ")
+        .padStart(firstLen, "-")
+        .padEnd(totalLen, "-"),
+      printDetail = `
+    >>> ${title}
+    >>> PROC :  ${_procName}\t\tPID :  ${_procId}
+    >>> DATA :\n${_error}
+    <<<  ${title}\n`;
+    console.log(printDetail);
+  }
+}
+
+class Converter {
+  static BufferToString(_data) {
+    return new Buffer(_data, "utf-8").toString();
+  }
+}
+
 class Response {
   constructor() {
     this.Header = null;
@@ -13,7 +36,17 @@ class Request {
 }
 
 class Curl {
-  constructor(_command, _showVerbose, _isVerbose, _isInsecure, _isWithHeader) {
+  constructor(
+    _command,
+    _showVerbose,
+    _isVerbose,
+    _isInsecure,
+    _isWithHeader,
+    _connectTimeout,
+    _maxTimeout
+  ) {
+    this.ConnectTimeout = _connectTimeout || 1000;
+    this.MaxTimeout = _maxTimeout || 3000;
     this.Command = _command || null;
     this.ShowVerbose = _showVerbose || false;
     this.IsVerbose = _isVerbose || false;
@@ -63,6 +96,10 @@ class Curl {
     args += this.IsInsecure ? " -k " : "";
     args += this.IsVerbose ? " -v " : "";
     args += this.IsWithHeader ? " -i " : "";
+    args += this.ConnectTimeout
+      ? ` --connect-timeout ${this.ConnectTimeout}`
+      : "";
+    args += this.MaxTimeout ? ` -m ${this.MaxTimeout}` : "";
     const newCommand = this.Command + ` ${args}`;
 
     return newCommand;
@@ -78,8 +115,15 @@ class Curl {
     if (this.IsInsecure) args.push("-k");
     if (this.IsVerbose) args.push("-v");
     if (this.IsWithHeader) args.push("-i");
+    if (this.ConnectTimeout)
+      args.push(`--connect-timeout`, this.ConnectTimeout);
+    if (this.MaxTimeout) args.push(`-m`, this.MaxTimeout);
 
-    if (this.IsVerbose) console.log("toCurlCommandArray() > ", args);
+    if (this.IsVerbose) {
+      console.log(">>> Command > ", args.join(" "));
+      console.log(">>> toCurlCommandArray() > ", args);
+    }
+
     this.CommandArgs = args;
     return args;
   }
@@ -118,7 +162,7 @@ class Curl {
   commandSpawn() {
     let self = this;
     const args = self.toCurlCommandArray();
-    let cmd = args.shift();
+    let cmd = args.shift(); //"C:\\_portables\\curl\\7.71.1\\bin\\curl.exe";
     const argsString = this.CommandArgs.join(" ");
 
     return new Promise(async (resolve, reject) => {
@@ -134,19 +178,23 @@ class Curl {
 
       task.stdout.on("data", function (_data) {
         stdoutChunks = stdoutChunks.concat(_data);
-        if (self.IsVerbose) {
-          console.log(`>>> task.on(data) >\r\n\t data: ${_data.toString()}`);
+
+        if (self.IsVerbose && _data) {
+          let methodDesc = "task.stdout.on(data)",
+            procName = cmd,
+            procId = task.pid,
+            stdoutContent = _data.toString();
+          Print.methodDetail(methodDesc, procName, procId, stdoutContent);
         }
       });
 
       task.stdout.on("end", function (_data) {
         if (self.IsVerbose && _data) {
-          var stdoutContent = stdoutChunks.toString();
-          console.log(
-            ">>> task.stdout.on(end) >\r\n\t exec:%s end with this: %s",
-            cmd,
-            stdoutContent
-          );
+          let methodDesc = "task.stdout.on(end)",
+            procName = cmd,
+            procId = task.pid,
+            stdoutContent = Converter.BufferToString(_data);
+          Print.methodDetail(methodDesc, procName, procId, stdoutContent);
         }
       });
 
@@ -154,12 +202,11 @@ class Curl {
         stderrChunks.push.apply(stderrChunks, _data);
 
         if (self.IsVerbose && _data) {
-          const result = new Buffer(_data, "utf-8").toString();
-          console.log(
-            ">>> task.stderr.on(data) >\r\n\t exec:%s error:\n%@",
-            cmd,
-            result
-          );
+          let methodDesc = "task.stderr.on(data)",
+            procName = cmd,
+            procId = task.pid,
+            stdoutContent = Converter.BufferToString(_data, "utf-8");
+          Print.methodDetail(methodDesc, procName, procId, stdoutContent);
         }
       });
 
@@ -167,35 +214,34 @@ class Curl {
         // var stderrContent = new Buffer(stderrChunks,"utf-8").toString()
         // this.StdErr = stderrContent;
         // reject(stderrContent)
-        // task.kill("SIGINT");
+        task.kill("SIGINT");
       });
 
       task.on("error", function (_error) {
         if (self.IsVerbose) {
-          console.log(
-            ">>> task.on(error) >\r\n\t exec:${argsString} error:\n%@",
-            _error
-          );
+          let methodDesc = "task.on(error)",
+            procName = cmd,
+            procId = task.pid;
+          Print.methodDetail(methodDesc, procName, procId, _error);
         }
       });
 
       task.on("uncaughtException", function (_error) {
-        if (self.IsVerbose)
-          console.log(
-            ">>> task.on(uncaughtException) >\r\n\t exec:%s uncaughtException:\n%@",
-            argsString,
-            _error
-          );
+        if (self.IsVerbose) {
+          let methodDesc = "task.on(uncaughtException)",
+            procName = cmd,
+            procId = task.pid;
+          Print.methodDetail(methodDesc, procName, procId, _error);
+        }
       });
 
-      task.on("close", (code, signal) => {
+      task.on("close", (_code, _signal) => {
         if (self.IsVerbose) {
-          console.log(
-            ">>> task.on(close) >\r\n\t task:%s pid:%s terminated due to receipt of signal:%s",
-            cmd,
-            task.pid,
-            signal
-          );
+          let methodDesc = "task.on(close)",
+            procName = cmd,
+            procId = task.pid,
+            message = `\t>>> task:${cmd} pid:${task.pid} terminated due to receipt of exit code:${_code} and signal:${_signal}`;
+          Print.methodDetail(methodDesc, procName, procId, message);
         }
       });
 
@@ -209,26 +255,28 @@ class Curl {
           var error = new Error();
           error.description = this.Command;
           error.code = code;
+
+          var stderrContent = Converter.BufferToString(stderrChunks, "utf-8");
+          this.StdErr = stderrContent;
+
           if (self.IsVerbose) {
-            console.log(
-              ">>> task.on(exit) >\r\n\t pid:%d Error:\n%@",
-              task.pid,
-              error
-            );
+            let methodDesc = "task.on(exit)",
+              procName = cmd,
+              procId = task.pid,
+              message = `\t>>> "${cmd}" was exited with this ERROR:\n ${stderrContent} \n\t StdoutContent: ${stdoutContent}`;
+            Print.methodDetail(methodDesc, procName, procId, message);
           }
 
-          var stderrContent = new Buffer(stderrChunks, "utf-8").toString();
-          this.StdErr = stderrContent;
           reject(stderrContent);
         }
         // at exit explicitly kill exited task
         // task.kill("SIGINT");
       });
-
     });
   }
 
   commandExec() {
+    let self = this;
     return new Promise((resolve, reject) => {
       const exec = require("child_process").exec;
 
