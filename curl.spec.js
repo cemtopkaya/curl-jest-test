@@ -1,8 +1,8 @@
 const Curl = require("./curl_wrapper").Curl;
 
 describe("Filter function", () => {
-  const curlConnectionTimeout = 2,
-    maxTimeout = 2,
+  const curlConnectTimeout = 1,
+    maxTimeout = 3,
     curlVerbose = false,
     curlInsecure = true,
     curlWithHeader = true,
@@ -13,7 +13,7 @@ describe("Filter function", () => {
     logEverything,
     curlInsecure,
     curlWithHeader,
-    curlConnectionTimeout,
+    curlConnectTimeout,
     maxTimeout
   );
   const apiRoot = "https://192.168.33.10:5021";
@@ -22,10 +22,12 @@ describe("Filter function", () => {
 
   test("GET nfprofile", async (done) => {
     curl.Command = `curl -X GET "${apiRoot}/nf-settings/v1/nfprofile" -H "accept: application/json"`;
-    curl.commandSpawn().then((d) => {
-      expect(curl.Response.StatusCode).toEqual(200);
-      done();
-    }, done);
+    curl
+      .commandSpawn()
+      .then((d) => {
+        expect(curl.Response.StatusCode).toEqual(200);
+      }, done)
+      .then(done);
   });
 
   test("PATCH nfprofile", async (done) => {

@@ -288,19 +288,15 @@ class Curl {
         self.StdErr = _stderr;
 
         if (self.ShowVerbose) {
-          console.log(`STDOUT >  ${_stdout} <`);
-          console.log(`ERROR >  ${_error} <`);
-          console.log(`STDERR > ${_stderr} <`);
+          const log = `\t>>> STDOUT\t: ${_stdout} 
+          \t>>> ERROR\t: ${_error} 
+          \t>>> STDERR\t: ${_stderr}`;
+          Print.methodDetail("commandExec", cmd, child.pid, log);
         }
 
         if (_error) {
-          const hata = `------------------------------
-        \tKomut:\t ${cmd}
-        \tHata:\t${_error.stack}
-        \tHata Kodu:\t${_error.code}
-        \tHata Sinyali:\t${_error.signal}
-        \tStdError:\t${_stderr}\r\n--------------------`;
-          console.log(hata);
+          const hata = `\n\t>>> Komut\t: ${cmd}\n\t>>> Hata\t: ${_error.stack}\n\t>>> Hata Kodu\t: ${_error.code}\n\t>>> Hata Sinyali\t: ${_error.signal}\n\t>>> StdError\t: ${_stderr}`;
+          Print.methodDetail("commandExec", cmd, child.pid, hata);
           reject(_error);
         } else {
           resolve(_stdout);
@@ -312,11 +308,6 @@ class Curl {
         reject(code);
       });
     });
-  }
-
-  execute() {
-    let self = this;
-    return new Promise((resolve, reject) => {});
   }
 }
 
